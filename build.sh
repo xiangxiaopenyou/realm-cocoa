@@ -182,7 +182,28 @@ build_combined() {
 
     # Combine ar archives
     LIPO_OUTPUT="$out_path/$product_name/$module_name"
-    xcrun lipo -create "$simulator_path/$binary_path" "$os_path/$binary_path" -output "$LIPO_OUTPUT"
+    # xcrun lipo -create "$simulator_path/$binary_path" "$os_path/$binary_path" -output "$LIPO_OUTPUT"
+
+    # ./tools/mergeLibs.sh "$LIPO_OUTPUT" \
+    #                       "$simulator_path/$binary_path" \
+    #                       "$os_path/$binary_path"
+
+    # isArm64Available=$(lipo "$simulator_path/$binary_path" -verify_arch arm64)
+    # if [[ $isArm64Available -eq 0 ]]; then
+    #     lipo "$simulator_path/$binary_path" -output "$simulator_path/$binary_path" -remove arm64
+    # fi
+    # xcrun lipo -create "$simulator_path/$binary_path" "$os_path/$binary_path" -output "$LIPO_OUTPUT"
+
+    isArm64Available=$(lipo "$simulator_path/$binary_path" -verify_arch arm64)
+    echo "fixing $LIPO_OUTPUT $($isArm64Available && echo "with arm64")"
+    if [[ $isArm64Available -eq 0 ]]; then
+      cp "$simulator_path/$binary_path" "$simulator_path/$binary_path.tmp"
+      lipo "$simulator_path/$binary_path.tmp" -output "$simulator_path/$binary_path.tmp" -remove arm64
+      xcrun lipo -create "$simulator_path/$binary_path.tmp" "$os_path/$binary_path" -output "$LIPO_OUTPUT"
+      rm -f "$simulator_path/$binary_path.tmp"
+    else
+      xcrun lipo -create "$simulator_path/$binary_path" "$os_path/$binary_path" -output "$LIPO_OUTPUT"
+    fi
 
     # The generated headers for Swift libraries have #ifdef checks to only
     # define symbols for the applicable platforms, so we need to merge them as
@@ -541,7 +562,7 @@ case "$COMMAND" in
         ;;
 
     "osx")
-        xc "-scheme Realm -configuration $CONFIGURATION"
+        xc "-scheme Realm -arch \"arm64 x86_64\" -configuration $CONFIGURATION"
         clean_retrieve "build/DerivedData/Realm/Build/Products/$CONFIGURATION/Realm.framework" "build/osx" "Realm.framework"
         exit 0
         ;;
